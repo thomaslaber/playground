@@ -1,0 +1,144 @@
+---
+title: "hypem"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r}
+#install.packages('rvest')
+
+library(rvest)
+library(httr)
+library(openxlsx)
+library(dplyr)
+
+# Date language problem
+Sys.setlocale("LC_TIME", "C");
+
+setup <- function(){
+  #Specifying the url for desired website to be scraped
+  url <- 'https://hypem.com/homer_jay_88/'
+  counter <- seq(1:20) #last: 19
+  config <- list(url = url,
+                 counter = counter)
+  
+  return(config)
+}
+
+sanitize <- function(x) {
+  if(length(x) == 0) {
+      x = "-"
+  }
+  return(x)
+}
+
+scrapPage <- function (url) {
+
+  data <- NULL
+  songs_final <- NULL
+  
+  # url <- "https://hypem.com/homer_jay_88/3/"
+  # Reading the HTML code from the website
+  webpage <- GET(url, add_headers(Cookie = 'eupubconsent=BOPbjdJOz2EcxAKAhAENAAAAyAAAAA; euconsent=BOPbjdJOz2EcxAKAhBENDK-AAAAvhr_7__7-_9_-_f__9uj3Gr_v_f__32ccL59v3h_7v-_7fi_-1nV4-_1vft9ydk1-5dtDztp507iakiPHmqNeb9n_mz1eZpRP58k09j5337Mw_v8_v-b7JCPN_Y3v-8K4; __utma=1717032.834699411.1538646883.1538646883.1538646883.1; googlepersonalization=Oyav2XOz2EcxgA; AUTH=03%3Aa82e12bba5187666ec4fc01f77b93440%3A1518848539%3A1349411633%3A09-AT')) %>%
+    read_html()
+  
+  #Using CSS selectors to scrape the rankings section
+  tracks <- html_nodes(webpage,'.section-track')
+  for (t in tracks) {
+
+    artist <- html_nodes(t,'.artist') %>% html_text()
+    title <- html_nodes(t,'.base-title') %>% html_text()
+    likes <- html_nodes(t,'.haarp-fav-count') %>% html_text() 
+    likes <- sub("K", "e3", likes, fixed = TRUE) %>% as.numeric()
+    link_type <- html_nodes(t,'.download > a') %>% html_text()
+    link <- html_nodes(t,'.download > a') %>% html_attr('href')
+    avi <- html_nodes(t,'.playdiv > a') %>% html_attr('title')
+    date <-  html_nodes(t,'.track-info') %>% html_text()
+    date <- strsplit(date, "on ")[[1]][2]
+    date <- gsub("st", "", date)
+    date <- gsub("nd", "", date)
+    date <- gsub("rd", "", date)
+    date <- gsub("th", "", date)
+    # print(date)
+    date <- as.Date(date, format='%B %d, %Y')
+    
+    infos <- list(artist = artist, 
+                  title = title, 
+                  likes = likes, 
+                  link_type = link_type, 
+                  link = link,
+                  avi = avi,
+                  date = date)
+
+    infos <- lapply(infos, sanitize)
+    
+    info = as.data.frame(infos, 
+                         stringsAsFactors = FALSE)
+    print(info)
+
+    
+    data <- rbind(data, info)
+  }
+  
+  return(data)
+}
+
+
+### MAIN.R ####
+config <- setup()
+songs_final <- NULL
+for(i in config$counter) {
+  url <- paste0(config$url,i,"/")
+  # print(url)
+  songs_final <- rbind(songs_final, scrapPage(url))
+  print(paste0(i, " von ", max(config$counter)))
+  Sys.sleep(3)
+}
+Sys
+export <- function(songs_final) {
+  openxlsx::write.xlsx(songs_final, file = paste0("hypem_", format(Sys.time(), "%Y_%m_%d") ,".xlsx"))
+  saveRDS(songs_final, file = paste0("hypem_", format(Sys.time(), "%Y_%m_%d") ,".RDS"))
+}
+
+# library(RSQLite)
+# exportSqlite <- function(songs_final) {
+#   con <- dbConnect(RSQLite::SQLite(), ":memory:")
+#   dbListTables(con)
+#   dbWriteTable(con, "mtcars", mtcars)
+# }
+
+readFiles <- function() {
+  path <- "Downloads/misc/bestofmusic/hypem Kopie/"
+  downloaded_songs <- list.files(path = path)
+  return(downloaded)
+}
+
+fuzzyMatching <- function() {
+  # https://github.com/markvanderloo/stringdist
+  # install.packages("stringdist")
+  library("stringdist")
+  
+  a <- c("Villach", "Klagenf", "Wien")
+  b <- c("Vilach", "Klagenf", "Wene")
+  dist <- adist(a, b, 
+                ignore.case = TRUE)
+  
+  min_dist <- apply(dist, 1, min)
+  
+  match <- NULL  
+  
+  for(i in 1:nrow(dist)) {
+      s2.i <- match(min_dist[i], dist[i])
+      s1.i <- i
+      match <- rbind(data.frame(s2.i = s2.i,
+                                s1.i = s1.i,
+                                s2name = b[s2.i], 
+                                s1name=a[s1.i], 
+                                adist = min_dist[i]),
+                     match)
+  }
+  
+}
+
+```
