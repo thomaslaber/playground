@@ -5,6 +5,8 @@ editor_options:
   chunk_output_type: inline
 ---
 
+## setup
+
 ```{r}
 #install.packages('rvest')
 
@@ -15,6 +17,12 @@ library(dplyr)
 
 # Date language problem
 Sys.setlocale("LC_TIME", "C");
+```
+
+## create functions
+
+
+```{r}
 
 setup <- function(){
   #Specifying the url for desired website to be scraped
@@ -84,6 +92,16 @@ scrapPage <- function (url) {
   return(data)
 }
 
+export <- function(songs_final) {
+  openxlsx::write.xlsx(songs_final, file = paste0("hypem_", format(Sys.time(), "%Y_%m_%d") ,".xlsx"))
+  saveRDS(songs_final, file = paste0("hypem_", format(Sys.time(), "%Y_%m_%d") ,".RDS"))
+}
+
+```
+
+## main
+
+```{r}
 
 ### MAIN.R ####
 config <- setup()
@@ -95,19 +113,18 @@ for(i in config$counter) {
   print(paste0(i, " von ", max(config$counter)))
   Sys.sleep(3)
 }
-Sys
-export <- function(songs_final) {
-  openxlsx::write.xlsx(songs_final, file = paste0("hypem_", format(Sys.time(), "%Y_%m_%d") ,".xlsx"))
-  saveRDS(songs_final, file = paste0("hypem_", format(Sys.time(), "%Y_%m_%d") ,".RDS"))
-}
-
+export(songs_final)
 # library(RSQLite)
 # exportSqlite <- function(songs_final) {
 #   con <- dbConnect(RSQLite::SQLite(), ":memory:")
 #   dbListTables(con)
 #   dbWriteTable(con, "mtcars", mtcars)
 # }
+```
 
+## experimental
+
+```{r}
 readFiles <- function() {
   path <- "Downloads/misc/bestofmusic/hypem Kopie/"
   downloaded_songs <- list.files(path = path)
