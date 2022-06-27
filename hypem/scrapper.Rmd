@@ -114,6 +114,8 @@ for(i in config$counter) {
   Sys.sleep(3)
 }
 export(songs_final)
+
+## ToDo: add sqllite support
 # library(RSQLite)
 # exportSqlite <- function(songs_final) {
 #   con <- dbConnect(RSQLite::SQLite(), ":memory:")
