@@ -35,7 +35,6 @@ def topstories(
     
     logger = get_dagster_logger()
 
-
     results = []
     for item_id in topstory_ids:
         item = requests.get(
@@ -44,7 +43,7 @@ def topstories(
         results.append(item)
 
         if len(results) % 20 == 0:
-            context.log.info(f"Got {len(results)} items so far.")
+            logger.info(f"Got {len(results)} items so far.")
 
     df = pd.DataFrame(results)
 
