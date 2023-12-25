@@ -10,20 +10,31 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 
 from dagster import AssetExecutionContext, MetadataValue, asset, MaterializeResult
+from typing import Dict, List  # add imports to the top of `assets.py`
+from dagster import get_dagster_logger # missing
+from .resources import DataGeneratorResource
 
-@asset # add the asset decorator to tell Dagster this is an asset
-def topstory_ids() -> None:
+
+@asset
+def topstory_ids() -> List:  # modify return type signature
     newstories_url = "https://hacker-news.firebaseio.com/v0/topstories.json"
     top_new_story_ids = requests.get(newstories_url).json()[:100]
 
-    os.makedirs("data", exist_ok=True)
-    with open("data/topstory_ids.json", "w") as f:
-        json.dump(top_new_story_ids, f)
+    return (
+        top_new_story_ids  # return top_new_story_ids and the I/O manager will save it
+    )
 
-@asset(deps=[topstory_ids])
-def topstories(context: AssetExecutionContext) -> MaterializeResult:
-    with open("data/topstory_ids.json", "r") as f:
-        topstory_ids = json.load(f)
+@asset(
+    group_name="hackernews",
+    io_manager_key="database_io_manager",  # Addition: `io_manager_key` specified
+)
+def topstories(
+    context: AssetExecutionContext,
+    topstory_ids: List,  # add topstory_ids as a function argument
+    ) -> pd.DataFrame:  # modify the return type signature
+    
+    logger = get_dagster_logger()
+
 
     results = []
     for item_id in topstory_ids:
@@ -36,21 +47,22 @@ def topstories(context: AssetExecutionContext) -> MaterializeResult:
             context.log.info(f"Got {len(results)} items so far.")
 
     df = pd.DataFrame(results)
-    df.to_csv("data/topstories.csv")
 
-    return MaterializeResult(
+    context.add_output_metadata(
         metadata={
-            "num_records": len(df),  # Metadata can be any key-value pair
+            "num_records": len(df),
             "preview": MetadataValue.md(df.head().to_markdown()),
-            # The `MetadataValue` class has useful static methods to build Metadata
         }
     )
 
-@asset(deps=[topstories])
-def most_frequent_words() -> MaterializeResult:
-    stopwords = ["a", "the", "an", "of", "to", "in", "for", "and", "with", "on", "is"]
+    return df  # return df and the I/O manager will save it
 
-    topstories = pd.read_csv("data/topstories.csv")
+@asset
+def most_frequent_words(
+    context: AssetExecutionContext,
+    topstories: pd.DataFrame,  # add topstories as a function argument
+    ) -> Dict:  # modify the return type signature
+    stopwords = ["a", "the", "an", "of", "to", "in", "for", "and", "with", "on", "is"]
 
     # loop through the titles and count the frequency of each word
     word_counts = {}
@@ -82,21 +94,22 @@ def most_frequent_words() -> MaterializeResult:
     # Convert the image to Markdown to preview it within Dagster
     md_content = f"![img](data:image/png;base64,{image_data.decode()})"
 
-    with open("data/most_frequent_words.json", "w") as f:
-        json.dump(top_words, f)
+    context.add_output_metadata(metadata={"plot": MetadataValue.md(md_content)})
 
-    # Attach the Markdown content as metadata to the asset
-    return MaterializeResult(metadata={"plot": MetadataValue.md(md_content)})
+    return top_words  # return top_words and the I/O manager will save it
 
 
+@asset
+def signups(hackernews_api: DataGeneratorResource) -> MaterializeResult:
+    signups = pd.DataFrame(hackernews_api.get_signups())
 
+    signups.to_csv("data/signups.csv")
 
-
-@asset # add the asset decorator to tell Dagster this is an asset
-def hypem_urls() -> None:
-    newstories_url = "https://hacker-news.firebaseio.com/v0/topstories.json"
-    top_new_story_ids = requests.get(newstories_url).json()[:100]
-
-    os.makedirs("data", exist_ok=True)
-    with open("data/topstory_ids.json", "w") as f:
-        json.dump(top_new_story_ids, f)
+    return MaterializeResult(
+        metadata={
+            "Record Count": len(signups),
+            "Preview": MetadataValue.md(signups.head().to_markdown()),
+            "Earliest Signup": signups["registered_at"].min(),
+            "Latest Signup": signups["registered_at"].max(),
+        }
+    )

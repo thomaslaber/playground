@@ -4,9 +4,12 @@ from dagster import (
     ScheduleDefinition,
     define_asset_job,
     load_assets_from_modules,
+    FilesystemIOManager,  # Update the imports at the top of the file to also include this
 )
 
 from . import assets
+from dagster_duckdb_pandas import DuckDBPandasIOManager
+from .resources import DataGeneratorResource
 
 all_assets = load_assets_from_modules([assets])
 
@@ -19,7 +22,19 @@ hackernews_schedule = ScheduleDefinition(
     cron_schedule="0 * * * *",  # every hour
 )
 
+io_manager = FilesystemIOManager(
+    base_dir="data",  # Path is built relative to where `dagster dev` is run
+)
+
+database_io_manager = DuckDBPandasIOManager(database="analytics.hackernews")
+datagen = DataGeneratorResource()  # Make the resource
+
 defs = Definitions(
     assets=all_assets,
     schedules=[hackernews_schedule],
+    resources={
+        "io_manager": io_manager,
+        "database_io_manager": database_io_manager,
+        "hackernews_api": datagen,  # Add the newly-made resource here
+    },
 )
